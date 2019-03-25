@@ -7,8 +7,9 @@ from btree import BTree
 from data.create_data import create_data, Distribution
 import time, gc, json
 import os, sys, getopt
+import numpy as np
 
-# Setting 
+# Setting
 BLOCK_SIZE = 100
 TOTAL_NUMBER = 300000
 
@@ -35,14 +36,14 @@ pathString = {
 
 # threshold for train (judge whether stop train and replace with BTree)
 thresholdPool = {
-    Distribution.RANDOM: [1, 4],    
+    Distribution.RANDOM: [1, 4],
     Distribution.EXPONENTIAL: [55, 10000]
-}   
+}
 
 # whether use threshold to stop train for models in stages
 useThresholdPool = {
-    Distribution.RANDOM: [True, False],    
-    Distribution.EXPONENTIAL: [True, False],    
+    Distribution.RANDOM: [True, False],
+    Distribution.EXPONENTIAL: [True, False],
 }
 
 # hybrid training structure, 2 stages
@@ -73,13 +74,13 @@ def hybrid_training(threshold, use_threshold, stage_nums, core_nums, train_step_
                     test_labels.append(int(k * divisor))
             else:
                 labels = tmp_labels[i][j]
-                test_labels = test_data_y    
-            # train model                    
+                test_labels = test_data_y
+            # train model
             tmp_index = TrainedNN(threshold[i], use_threshold[i], core_nums[i], train_step_nums[i], batch_size_nums[i],
                                     learning_rate_nums[i],
-                                    keep_ratio_nums[i], inputs, labels, test_inputs, test_labels)            
-            tmp_index.train()      
-            # get parameters in model (weight matrix and bias matrix)      
+                                    keep_ratio_nums[i], inputs, labels, test_inputs, test_labels)
+            tmp_index.train()
+            # get parameters in model (weight matrix and bias matrix)
             index[i][j] = AbstractNN(tmp_index.get_weights(), tmp_index.get_bias(), core_nums[i], tmp_index.cal_err())
             del tmp_index
             gc.collect()
@@ -87,7 +88,7 @@ def hybrid_training(threshold, use_threshold, stage_nums, core_nums, train_step_
                 # allocate data into training set for models in next stage
                 for ind in range(len(tmp_inputs[i][j])):
                     # pick model in next stage with output of this model
-                    p = index[i][j].predict(tmp_inputs[i][j][ind])                    
+                    p = index[i][j].predict(tmp_inputs[i][j][ind])
                     if p > stage_nums[i + 1] - 1:
                         p = stage_nums[i + 1] - 1
                     tmp_inputs[i + 1][p].append(tmp_inputs[i][j][ind])
@@ -103,6 +104,10 @@ def hybrid_training(threshold, use_threshold, stage_nums, core_nums, train_step_
             index[stage_length - 1][i] = BTree(2)
             index[stage_length - 1][i].build(tmp_inputs[stage_length - 1][i], tmp_labels[stage_length - 1][i])
     return index
+
+def dfn(o):
+    if isinstance(o, np.int64): return int(o)
+    raise TypeError
 
 # main function for training idnex
 def train_index(threshold, use_threshold, distribution, path):
@@ -144,7 +149,7 @@ def train_index(threshold, use_threshold, distribution, path):
         #train_set_y.append(data.ix[i, 1])
 
     test_set_x = train_set_x[:]
-    test_set_y = train_set_y[:]     
+    test_set_y = train_set_y[:]
     # data = pd.read_csv("data/random_t.csv", header=None)
     # data = pd.read_csv("data/exponential_t.csv", header=None)
     # for i in range(data.shape[0]):
@@ -201,7 +206,7 @@ def train_index(threshold, use_threshold, distribution, path):
                                   "bias": trained_index[1][ind].weights}
     result = [{"stage": 1, "parameters": result_stage1}, {"stage": 2, "parameters": result_stage2}]
 
-    with open("model/" + pathString[distribution] + "/full_train/NN/" + str(TOTAL_NUMBER) + ".json", "wb") as jsonFile:
+    with open("model/" + pathString[distribution] + "/full_train/NN/" + str(TOTAL_NUMBER) + ".json", "w") as jsonFile:
         json.dump(result, jsonFile)
 
     # wirte performance into files
@@ -209,12 +214,12 @@ def train_index(threshold, use_threshold, distribution, path):
                       "store size": os.path.getsize(
                           "model/" + pathString[distribution] + "/full_train/NN/" + str(TOTAL_NUMBER) + ".json")}
     with open("performance/" + pathString[distribution] + "/full_train/NN/" + str(TOTAL_NUMBER) + ".json",
-              "wb") as jsonFile:
+              "w") as jsonFile:
         json.dump(performance_NN, jsonFile)
 
     del trained_index
     gc.collect()
-    
+
     # build BTree index
     print("*************start BTree************")
     bt = BTree(2)
@@ -237,7 +242,7 @@ def train_index(threshold, use_threshold, distribution, path):
             while pos != test_set_y[ind]:
                 pos += flag * off
                 flag = -flag
-                off += 1            
+                off += 1
     end_time = time.time()
     search_time = (end_time - start_time) / len(test_set_x)
     print("Search time ", search_time)
@@ -258,8 +263,8 @@ def train_index(threshold, use_threshold, distribution, path):
         result.append(tmp)
 
     with open("model/" + pathString[distribution] + "/full_train/BTree/" + str(TOTAL_NUMBER) + ".json",
-              "wb") as jsonFile:
-        json.dump(result, jsonFile)
+              "w") as jsonFile:
+        json.dump(result, jsonFile, default=dfn)
 
     # write performance into files
     performance_BTree = {"type": "BTree", "build time": build_time, "search time": search_time,
@@ -267,7 +272,7 @@ def train_index(threshold, use_threshold, distribution, path):
                          "store size": os.path.getsize(
                              "model/" + pathString[distribution] + "/full_train/BTree/" + str(TOTAL_NUMBER) + ".json")}
     with open("performance/" + pathString[distribution] + "/full_train/BTree/" + str(TOTAL_NUMBER) + ".json",
-              "wb") as jsonFile:
+              "w") as jsonFile:
         json.dump(performance_BTree, jsonFile)
 
     del bt
@@ -367,14 +372,14 @@ def sample_train(threshold, use_threshold, distribution, training_percent, path)
     result = [{"stage": 1, "parameters": result_stage1}, {"stage": 2, "parameters": result_stage2}]
 
     with open("model/" + pathString[distribution] + "/sample_train/NN/" + str(training_percent) + ".json",
-              "wb") as jsonFile:
+              "w") as jsonFile:
         json.dump(result, jsonFile)
 
     performance_NN = {"type": "NN", "build time": learn_time, "search time": search_time, "average error": mean_error,
                       "store size": os.path.getsize(
                           "model/" + pathString[distribution] + "/sample_train/NN/" + str(training_percent) + ".json")}
     with open("performance/" + pathString[distribution] + "/sample_train/NN/" + str(training_percent) + ".json",
-              "wb") as jsonFile:
+              "w") as jsonFile:
         json.dump(performance_NN, jsonFile)
 
     del trained_index
@@ -488,7 +493,7 @@ def main(argv):
         return
     if do_create:
         create_data(distribution, num)
-    if is_sample:        
+    if is_sample:
         sample_train(thresholdPool[distribution], useThresholdPool[distribution], distribution, per, filePath[distribution])
     else:
         train_index(thresholdPool[distribution], useThresholdPool[distribution], distribution, filePath[distribution])

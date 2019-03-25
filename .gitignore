@@ -1,2 +1,9 @@
 ### Pycharm
+
 .idea/
+
+data/
+
+__pycache__/
+
+performance/
